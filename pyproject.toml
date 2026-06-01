@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nw-provision"
+version = "0.1.0"
+description = "Write NW-Device-Specification Page 0 identity blocks to NorthernWidget boards via avrdude"
+license = {text = "GPL-3.0-or-later"}
+requires-python = ">=3.9"
+dependencies = [
+    "click>=8.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+nw-provision = "nw_provision.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
