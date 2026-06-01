@@ -2,6 +2,27 @@ import click
 from .avrdude import AvrdudeError, patch_eeprom, read_eeprom, write_eeprom
 from .devices import DEVICES
 from .page0 import build_page0, verify_page0
+from .registry import NWRegistry, RegistryError
+
+_PROGRAMMABLE = sorted(k for k, v in DEVICES.items() if v.has_mcu)
+
+
+def _parse_int(s: str, param_hint: str) -> int:
+    """Parse a decimal or 0x-hex integer string; raise BadParameter on failure."""
+    try:
+        return int(s, 0)
+    except ValueError:
+        raise click.BadParameter(f"expected an integer (decimal or 0x hex), got {s!r}",
+                                 param_hint=param_hint)
+
+
+def _resolve_registry(registry_path: str | None) -> NWRegistry | None:
+    if registry_path:
+        try:
+            return NWRegistry(registry_path)
+        except RegistryError as e:
+            raise click.ClickException(str(e))
+    return None
 
 
 @click.group()
@@ -11,26 +32,54 @@ def main():
 
 
 @main.command()
-@click.option("--device",      required=True, type=click.Choice(sorted(k for k, v in DEVICES.items() if v.has_mcu)), help="Device name")
+@click.option("--device",      required=True, type=click.Choice(_PROGRAMMABLE), help="Device name")
 @click.option("--hw-version",  required=True, help="Hardware version, e.g. 3.0")
 @click.option("--fw-patch",    default=0, show_default=True, type=int, help="Firmware patch version")
-@click.option("--group",       "group_id",  default=0, show_default=True, type=int, help="Group ID (0–65535)")
-@click.option("--id",          "unique_id", required=True, type=int, help="Unique ID (0–65535)")
+@click.option("--group",       "group_id_str", default="0", show_default=True,
+              help="Group ID — decimal or 0x hex, e.g. 0x4E57")
+@click.option("--id",          "unique_id_str", required=True,
+              help="Unique ID — decimal, 0x hex, or 'auto' (requires --registry)")
+@click.option("--registry",    "registry_path", default=None, envvar="NW_REGISTRY_PATH",
+              help="Path to NW-Registry directory (or set NW_REGISTRY_PATH)")
 @click.option("--i2c-address", default=None, type=int,
               help="I2C address override (default: device default from table)")
 @click.option("--programmer",  default=None, help="avrdude programmer ID, e.g. usbasp, avrisp2")
 @click.option("--port",        default=None, help="Programmer port, e.g. /dev/ttyUSB0 (omit if not needed)")
 @click.option("--part",        default=None, help="avrdude part override (default: from device table)")
 @click.option("--dry-run",     is_flag=True, help="Print Page 0 bytes; do not write to hardware")
-def write(device, hw_version, fw_patch, group_id, unique_id, i2c_address,
-          programmer, port, part, dry_run):
+def write(device, hw_version, fw_patch, group_id_str, unique_id_str, registry_path,
+          i2c_address, programmer, port, part, dry_run):
     """Build and write a Page 0 identity block to a NorthernWidget board."""
     try:
         hw_major, hw_minor = (int(x) for x in hw_version.split("."))
     except ValueError:
         raise click.BadParameter("must be in major.minor format, e.g. 3.0", param_hint="--hw-version")
 
+    group_id = _parse_int(group_id_str, "--group")
     dev = DEVICES[device]
+    reg = _resolve_registry(registry_path)
+
+    # board_type: high byte from device table, low byte = hw_major (Schema 1 convention)
+    board_type = (dev.board_type_high << 8) | hw_major
+
+    # Resolve unique_id
+    if unique_id_str.lower() == "auto":
+        if reg is None:
+            raise click.UsageError("--id auto requires --registry or NW_REGISTRY_PATH")
+        try:
+            proposed = reg.next_individual_id(device, board_type)
+        except RegistryError as e:
+            raise click.ClickException(str(e))
+        click.echo(f"Next available ID: {proposed} (0x{proposed:04X})")
+        click.confirm("Use this ID?", abort=True)
+        unique_id = proposed
+    else:
+        unique_id = _parse_int(unique_id_str, "--id")
+        if reg and reg.check_duplicate(device, board_type, unique_id):
+            click.echo(f"Warning: ID 0x{unique_id:04X} already exists in registry for "
+                       f"{device} board_type 0x{board_type:04X}.", err=True)
+            click.confirm("Continue anyway?", abort=True)
+
     addr = i2c_address if i2c_address is not None else dev.i2c_address
 
     page0 = build_page0(
@@ -40,15 +89,15 @@ def write(device, hw_version, fw_patch, group_id, unique_id, i2c_address,
         fw_patch=fw_patch,
         group_id=group_id,
         unique_id=unique_id,
-        board_type_high=dev.board_type_high,
+        board_type=board_type,
         i2c_address=addr,
     )
 
     click.echo(f"Device:      {device}")
-    click.echo(f"HW version:  {hw_major}.{hw_minor}")
+    click.echo(f"HW version:  {hw_major}.{hw_minor}  (board_type 0x{board_type:04X})")
     click.echo(f"FW patch:    {fw_patch}")
-    click.echo(f"Group ID:    {group_id} (0x{group_id:04X})")
-    click.echo(f"Unique ID:   {unique_id} (0x{unique_id:04X})")
+    click.echo(f"Group ID:    0x{group_id:04X}")
+    click.echo(f"Unique ID:   0x{unique_id:04X}")
     click.echo(f"I2C address: 0x{addr:02X}" + (" [device default]" if addr == 0xFF else ""))
     click.echo(f"EEPROM:      {dev.eeprom_size} bytes — Page 0 at offset {dev.eeprom_size - 32} (0x{dev.eeprom_size - 32:04X})")
     click.echo("")
@@ -90,9 +139,18 @@ def write(device, hw_version, fw_patch, group_id, unique_id, i2c_address,
     except AvrdudeError as e:
         raise click.ClickException(str(e))
 
+    # Update registry after confirmed successful write
+    if reg:
+        try:
+            reg.append_unit(device, board_type, group_id, unique_id, hw_version)
+            click.echo(f"Registry updated: {device} 0x{board_type:04X} "
+                       f"group=0x{group_id:04X} id=0x{unique_id:04X}")
+        except RegistryError as e:
+            click.echo(f"Warning: registry not updated — {e}", err=True)
+
 
 @main.command()
-@click.option("--device",     required=True, type=click.Choice(sorted(k for k, v in DEVICES.items() if v.has_mcu)), help="Device name")
+@click.option("--device",     required=True, type=click.Choice(_PROGRAMMABLE), help="Device name")
 @click.option("--programmer", required=True, help="avrdude programmer ID, e.g. usbasp, avrisp2")
 @click.option("--port",       default=None,  help="Programmer port (omit if not needed)")
 @click.option("--part",       default=None,  help="avrdude part override (default: from device table)")
