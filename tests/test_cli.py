@@ -98,20 +98,9 @@ def test_location_notes_written_to_registry(tmp_path):
 
     from unittest.mock import patch, MagicMock
 
-    fake_eeprom = bytes(1024)
     ok_result = MagicMock()
     ok_result.returncode = 0
     ok_result.stdout = "avrdude: done"
-
-    def fake_run(args, **kwargs):
-        u_arg = next((a for a in args if "eeprom" in a), None)
-        if u_arg and ":r:" in u_arg:
-            outfile = u_arg.split(":")[2]
-            with open(outfile, "wb") as f:
-                f.write(fake_eeprom)
-        elif u_arg and ":r:" in u_arg:
-            pass
-        return ok_result
 
     def fake_run_all(args, **kwargs):
         u_arg = next((a for a in args if a.startswith("eeprom:")), None)
@@ -120,7 +109,7 @@ def test_location_notes_written_to_registry(tmp_path):
             from nw_provision.page0 import build_page0
             page0 = build_page0("Walrus", hw_major=0, hw_minor=2, fw_patch=0,
                                  group_id=0, unique_id=1, board_type=0x5700)
-            data = bytearray(1024)
+            data = bytearray(256)  # ATtiny1634 has 256 B EEPROM
             data[-32:] = page0
             with open(outfile, "wb") as f:
                 f.write(bytes(data))
