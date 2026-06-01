@@ -1,9 +1,0 @@
-Metadata-Version: 2.4
-Name: nw-provision
-Version: 0.1.0
-Summary: Write NW-Device-Specification Page 0 identity blocks to NorthernWidget boards via avrdude
-License: GPL-3.0-or-later
-Requires-Python: >=3.9
-Requires-Dist: click>=8.0
-Provides-Extra: dev
-Requires-Dist: pytest; extra == "dev"
