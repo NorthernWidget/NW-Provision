@@ -11,8 +11,7 @@ Layout (Schema 1):
   0x09        HW minor
   0x0A        FW patch  (NW combined-repo convention; 0x0B–0x0D = 0x00)
   0x0B–0x0F   Reserved (0x00)
-  0x10        Board type high byte (ASCII of device name[0])
-  0x11        Board type low byte  (HW major = revision index)
+  0x10–0x11   Board type (2 bytes, from NW-Registry board_types.csv)
   0x12–0x13   Group ID (big-endian uint16)
   0x14–0x15   Unique ID (big-endian uint16)
   0x16–0x17   FirmwareID legacy (0x00)
@@ -44,7 +43,7 @@ def build_page0(
     fw_patch: int,
     group_id: int,
     unique_id: int,
-    board_type_high: int,
+    board_type: int,
     i2c_address: int = 0xFF,
 ) -> bytes:
     """Return the 32-byte Page 0 block for a NW device."""
@@ -73,8 +72,8 @@ def build_page0(
     # 0x0B–0x0F: stay 0x00
 
     # Block 2: serial number
-    buf[0x10] = board_type_high              # from device table; not always ASCII of name[0]
-    buf[0x11] = hw_major                     # revision index; equals hw_major for most NW devices
+    buf[0x10] = (board_type >> 8) & 0xFF
+    buf[0x11] = board_type & 0xFF
     buf[0x12] = (group_id >> 8) & 0xFF
     buf[0x13] = group_id & 0xFF
     buf[0x14] = (unique_id >> 8) & 0xFF
