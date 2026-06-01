@@ -4,6 +4,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Device:
     name: str               # up to 7 ASCII chars; written to Page 0 bytes 0x01–0x07
+    mcu: str                # human-readable MCU name, e.g. "ATmega1284P"
     eeprom_size: int        # total EEPROM bytes; Page 0 lives at eeprom_size - 32
                             # 0 = no MCU / not yet defined
     avrdude_part: str       # avrdude -p argument; "" = no MCU / not yet defined
@@ -15,12 +16,12 @@ class Device:
 
 
 DEVICES = {
-    #           name       eeprom  part      i2c    bt_high  has_mcu
-    "Margay":  Device("Margay",  4096, "m1284p", 0xFF,  0x4D),          # 'M' — follows ASCII scheme
-    "Okapi":   Device("Okapi",   4096, "m1284p", 0xFF,  0x99),          # legacy Resnik code
-    "Apis":    Device("Apis",    1024, "m328p",  0x41,  0x6C),          # legacy "Project Symbiont Lidar"
-    "Haar":    Device("Haar",    1024, "m328p",  0x48,  0x48),          # 'H' — follows ASCII scheme
-    "Walrus":  Device("Walrus",  1024, "m328p",  0x57,  0x57),          # 'W' — follows ASCII scheme
-    "Libelle": Device("Libelle", 1024, "m328p",  0x4C,  0x23),          # legacy Dyson SW code
-    "Liasis":  Device("Liasis",  0,    "",       0xFF,  0x24, False),   # no MCU yet; future addition
+    #           name       mcu             eeprom  part      i2c    bt_high  has_mcu
+    "Margay":  Device("Margay",  "ATmega1284P", 4096, "m1284p", 0xFF,  0x4D),
+    "Okapi":   Device("Okapi",   "ATmega1284P", 4096, "m1284p", 0xFF,  0x99),
+    "Apis":    Device("Apis",    "ATtiny1634",   256, "t1634",  0x41,  0x6C),
+    "Haar":    Device("Haar",    "ATtiny1634",   256, "t1634",  0x48,  0x48),
+    "Walrus":  Device("Walrus",  "ATtiny1634",   256, "t1634",  0x57,  0x57),
+    "Libelle": Device("Libelle", "ATtiny841",    512, "t841",   0x4C,  0x23),
+    "Liasis":  Device("Liasis",  "",               0, "",       0xFF,  0x24, False),
 }
