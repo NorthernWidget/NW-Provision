@@ -11,7 +11,7 @@ def main():
 
 
 @main.command()
-@click.option("--device",      required=True, type=click.Choice(sorted(DEVICES)), help="Device name")
+@click.option("--device",      required=True, type=click.Choice(sorted(k for k, v in DEVICES.items() if v.has_mcu)), help="Device name")
 @click.option("--hw-version",  required=True, help="Hardware version, e.g. 3.0")
 @click.option("--fw-patch",    default=0, show_default=True, type=int, help="Firmware patch version")
 @click.option("--group",       "group_id",  default=0, show_default=True, type=int, help="Group ID (0–65535)")
@@ -92,7 +92,7 @@ def write(device, hw_version, fw_patch, group_id, unique_id, i2c_address,
 
 
 @main.command()
-@click.option("--device",     required=True, type=click.Choice(sorted(DEVICES)), help="Device name")
+@click.option("--device",     required=True, type=click.Choice(sorted(k for k, v in DEVICES.items() if v.has_mcu)), help="Device name")
 @click.option("--programmer", required=True, help="avrdude programmer ID, e.g. usbasp, avrisp2")
 @click.option("--port",       default=None,  help="Programmer port (omit if not needed)")
 @click.option("--part",       default=None,  help="avrdude part override (default: from device table)")
