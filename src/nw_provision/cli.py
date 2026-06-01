@@ -91,6 +91,41 @@ def write(device, hw_version, fw_patch, group_id, unique_id, i2c_address,
 
 
 @main.command()
+@click.option("--device",     required=True, type=click.Choice(sorted(DEVICES)), help="Device name")
+@click.option("--programmer", required=True, help="avrdude programmer ID, e.g. usbasp, avrisp2")
+@click.option("--port",       default=None,  help="Programmer port (omit if not needed)")
+@click.option("--part",       default=None,  help="avrdude part override (default: from device table)")
+def read(device, programmer, port, part):
+    """Read and display the Page 0 identity block from a connected board."""
+    dev = DEVICES[device]
+    avrdude_part = part or dev.avrdude_part
+
+    try:
+        click.echo(f"Reading EEPROM via {programmer} ({avrdude_part})...")
+        eeprom = read_eeprom(programmer, avrdude_part, port)
+    except AvrdudeError as e:
+        raise click.ClickException(str(e))
+
+    if len(eeprom) != dev.eeprom_size:
+        raise click.ClickException(
+            f"Read {len(eeprom)} bytes but {device} expects {dev.eeprom_size}"
+        )
+
+    page0 = eeprom[-32:]
+    click.echo("")
+    _print_page0(page0)
+    click.echo("")
+
+    ok, errors = verify_page0(page0)
+    if ok:
+        click.echo("OK — Page 0 is valid Schema 1")
+    else:
+        for msg in errors:
+            click.echo(f"FAIL: {msg}", err=True)
+        raise SystemExit(1)
+
+
+@main.command()
 @click.argument("hexbytes", nargs=-1)
 def verify(hexbytes):
     """Verify a 32-byte Page 0 block passed as hex bytes.
