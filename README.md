@@ -10,7 +10,7 @@ NW-Provision replaces the manual `MargaySetup.ino` workflow (flash setup sketch 
 pip install nw-provision
 ```
 
-Requires Python ≥ 3.9 and `avrdude` on your PATH.
+Requires Python ≥ 3.11 and `avrdude` on your PATH.
 
 ## Subcommands
 
@@ -42,6 +42,8 @@ Full options:
 | `--programmer` | — | avrdude programmer ID, e.g. `usbasp`, `avrisp2` |
 | `--port` | — | Programmer port, e.g. `/dev/ttyUSB0` (omit if not needed) |
 | `--part` | from device table | avrdude part override |
+| `--location` | `""` | Deployment location note written to registry |
+| `--notes` | `""` | Freeform notes written to registry |
 | `--dry-run` | — | Print Page 0 bytes; do not write to hardware |
 
 Set `NW_REGISTRY_PATH` in your environment to avoid passing `--registry` every time:
@@ -50,6 +52,15 @@ Set `NW_REGISTRY_PATH` in your environment to avoid passing `--registry` every t
 export NW_REGISTRY_PATH=/path/to/NW-Registry
 nw-provision write --device Margay --hw-version 3.0 --id auto --programmer usbasp
 ```
+
+### `list` — query the registry
+
+```
+nw-provision list --device Haar
+nw-provision list --device Margay --board-type 0x4D03
+```
+
+Displays a formatted table of all units for a device from the registry, with a summary line showing the count and next available ID. `--board-type` filters to a specific hardware version.
 
 ### `read` — display a board's identity block
 
@@ -107,7 +118,7 @@ Physical location: `EEPROM[length-32]` through `EEPROM[length-1]`.
 [NW-Registry](https://github.com/NorthernWidget/NW-Registry) is the companion CSV database of programmed boards. When `--registry` is provided:
 
 - `--id auto` queries `units/<device>.csv` for the highest `individual_id` with the matching `board_type`, increments it, and prompts for confirmation.
-- After a successful write, the new unit row is appended to the registry automatically.
+- After a successful write, the new unit row is appended to the registry automatically, including any `--location` and `--notes` provided.
 - If a manually-specified `--id` already exists, a warning is shown and confirmation is required to continue.
 
 `individual_id` increments globally per `board_type`, not per group.
