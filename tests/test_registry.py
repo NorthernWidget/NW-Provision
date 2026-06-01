@@ -98,6 +98,35 @@ def test_check_duplicate_not_found(tmp_path):
     assert reg.check_duplicate("Margay", 0x4D03, 0x0002) is False
 
 
+# --- list_units ---
+
+def test_list_units_empty(tmp_path):
+    reg = make_registry(tmp_path, units={"Margay": []})
+    assert reg.list_units("Margay") == []
+
+def test_list_units_no_file(tmp_path):
+    reg = make_registry(tmp_path)
+    assert reg.list_units("Margay") == []
+
+def test_list_units_returns_all_rows(tmp_path):
+    reg = make_registry(tmp_path, units={"Margay": [
+        ["0x4D03", "0x4E57", "0x0001", "0x0000", "3.0.0", "Iowa", ""],
+        ["0x4D03", "0x4E57", "0x0002", "0x0000", "3.0.0", "Alaska", ""],
+    ]})
+    rows = reg.list_units("Margay")
+    assert len(rows) == 2
+    assert rows[0]["individual_id"] == "0x0001"
+
+def test_list_units_filters_by_board_type(tmp_path):
+    reg = make_registry(tmp_path, units={"Margay": [
+        ["0x4D02", "0x4E57", "0x0001", "0x0000", "2.0.0", "", ""],
+        ["0x4D03", "0x4E57", "0x0002", "0x0000", "3.0.0", "", ""],
+    ]})
+    rows = reg.list_units("Margay", board_type=0x4D03)
+    assert len(rows) == 1
+    assert rows[0]["individual_id"] == "0x0002"
+
+
 # --- append_unit ---
 
 def test_append_unit(tmp_path):

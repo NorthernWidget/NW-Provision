@@ -71,6 +71,17 @@ class NWRegistry:
                     return True
         return False
 
+    def list_units(self, device: str, board_type: int | None = None) -> list[dict]:
+        """Return all unit rows for device, optionally filtered by board_type."""
+        path = self._units_path(device)
+        if not path.exists():
+            return []
+        with open(path, newline="") as f:
+            rows = list(csv.DictReader(f))
+        if board_type is not None:
+            rows = [r for r in rows if _parse_hex(r["board_type"]) == board_type]
+        return rows
+
     def append_unit(
         self,
         device: str,
