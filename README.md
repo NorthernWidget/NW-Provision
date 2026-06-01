@@ -80,15 +80,15 @@ Accepts 32 space-separated hex bytes and validates them offline (no hardware nee
 
 ## Supported devices
 
-| Device | EEPROM | avrdude part | I2C address | board_type high byte |
-|--------|--------|-------------|-------------|----------------------|
-| Margay | 4096 B | m1284p | — | 0x4D |
-| Okapi  | 4096 B | m1284p | — | 0x99 |
-| Apis   | 1024 B | m328p  | 0x41 | 0x6C |
-| Haar   | 1024 B | m328p  | 0x48 | 0x48 |
-| Walrus | 1024 B | m328p  | 0x57 | 0x57 |
-| Libelle | 1024 B | m328p | 0x4C | 0x23 |
-| Liasis | — | — | — | 0x24 (no MCU; future) |
+| Device  | MCU          | EEPROM | avrdude part | I2C address | board_type high byte |
+|---------|-------------|--------|-------------|-------------|----------------------|
+| Margay  | ATmega1284P | 4096 B | m1284p      | —           | 0x4D |
+| Okapi   | ATmega1284P | 4096 B | m1284p      | —           | 0x99 |
+| Apis    | ATtiny1634  | 256 B  | t1634       | 0x41        | 0x6C |
+| Haar    | ATtiny1634  | 256 B  | t1634       | 0x48        | 0x48 |
+| Walrus  | ATtiny1634  | 256 B  | t1634       | 0x57        | 0x57 |
+| Libelle | ATtiny841   | 512 B  | t841        | 0x4C        | 0x23 |
+| Liasis  | — (future)  | —      | —           | —           | 0x24 |
 
 `board_type` written to the EEPROM is computed as `(board_type_high << 8) | hw_major` per Schema 1.
 
