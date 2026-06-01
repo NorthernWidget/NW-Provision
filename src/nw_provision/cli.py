@@ -46,9 +46,11 @@ def main():
 @click.option("--programmer",  default=None, help="avrdude programmer ID, e.g. usbasp, avrisp2")
 @click.option("--port",        default=None, help="Programmer port, e.g. /dev/ttyUSB0 (omit if not needed)")
 @click.option("--part",        default=None, help="avrdude part override (default: from device table)")
+@click.option("--location",    default="", help="Physical location note written to registry")
+@click.option("--notes",       default="", help="Freeform notes written to registry")
 @click.option("--dry-run",     is_flag=True, help="Print Page 0 bytes; do not write to hardware")
 def write(device, hw_version, fw_patch, group_id_str, unique_id_str, registry_path,
-          i2c_address, programmer, port, part, dry_run):
+          i2c_address, programmer, port, part, location, notes, dry_run):
     """Build and write a Page 0 identity block to a NorthernWidget board."""
     try:
         hw_major, hw_minor = (int(x) for x in hw_version.split("."))
@@ -142,7 +144,8 @@ def write(device, hw_version, fw_patch, group_id_str, unique_id_str, registry_pa
     # Update registry after confirmed successful write
     if reg:
         try:
-            reg.append_unit(device, board_type, group_id, unique_id, hw_version)
+            reg.append_unit(device, board_type, group_id, unique_id, hw_version,
+                            location=location, notes=notes)
             click.echo(f"Registry updated: {device} 0x{board_type:04X} "
                        f"group=0x{group_id:04X} id=0x{unique_id:04X}")
         except RegistryError as e:
