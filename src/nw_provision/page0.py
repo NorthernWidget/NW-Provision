@@ -44,6 +44,7 @@ def build_page0(
     fw_patch: int,
     group_id: int,
     unique_id: int,
+    board_type_high: int,
     i2c_address: int = 0xFF,
 ) -> bytes:
     """Return the 32-byte Page 0 block for a NW device."""
@@ -72,8 +73,8 @@ def build_page0(
     # 0x0B–0x0F: stay 0x00
 
     # Block 2: serial number
-    buf[0x10] = ord(device_name[0])          # ASCII of first letter
-    buf[0x11] = hw_major                     # revision index = HW major
+    buf[0x10] = board_type_high              # from device table; not always ASCII of name[0]
+    buf[0x11] = hw_major                     # revision index; equals hw_major for most NW devices
     buf[0x12] = (group_id >> 8) & 0xFF
     buf[0x13] = group_id & 0xFF
     buf[0x14] = (unique_id >> 8) & 0xFF

@@ -4,7 +4,7 @@ from nw_provision.page0 import build_page0, crc8, verify_page0, PAGE0_SIZE, SCHE
 
 def margay(**kwargs):
     defaults = dict(device_name="Margay", hw_major=3, hw_minor=0, fw_patch=2,
-                    group_id=0, unique_id=1)
+                    group_id=0, unique_id=1, board_type_high=0x4D)
     defaults.update(kwargs)
     return build_page0(**defaults)
 
@@ -34,15 +34,18 @@ def test_name_margay():
     assert p[0x07] == 0x00  # null pad (6 chars → pad 1)
 
 def test_name_libelle_fills_field():
-    p = build_page0("Libelle", hw_major=1, hw_minor=0, fw_patch=0, group_id=0, unique_id=0)
+    p = build_page0("Libelle", hw_major=1, hw_minor=0, fw_patch=0,
+                    group_id=0, unique_id=0, board_type_high=0x23)
     assert p[0x01:0x08] == b"Libelle"  # exactly 7 chars, no pad needed
 
 def test_name_truncates_at_7():
-    p = build_page0("ABCDEFGH", hw_major=1, hw_minor=0, fw_patch=0, group_id=0, unique_id=0)
+    p = build_page0("ABCDEFGH", hw_major=1, hw_minor=0, fw_patch=0,
+                    group_id=0, unique_id=0, board_type_high=0x41)
     assert p[0x01:0x08] == b"ABCDEFG"
 
 def test_hw_version():
-    p = build_page0("Margay", hw_major=3, hw_minor=2, fw_patch=0, group_id=0, unique_id=0)
+    p = build_page0("Margay", hw_major=3, hw_minor=2, fw_patch=0,
+                    group_id=0, unique_id=0, board_type_high=0x4D)
     assert p[0x08] == 3
     assert p[0x09] == 2
 
@@ -50,21 +53,29 @@ def test_fw_patch():
     p = margay(fw_patch=7)
     assert p[0x0A] == 7
 
-def test_board_type_high_byte():
-    p = margay()
-    assert p[0x10] == ord('M')  # 0x4D
+def test_board_type_high_byte_from_argument():
+    p = margay(board_type_high=0x4D)
+    assert p[0x10] == 0x4D
+
+def test_board_type_high_legacy_code():
+    # Apis uses legacy 0x6C ("Project Symbiont Lidar"), not ASCII('A')=0x41
+    p = build_page0("Apis", hw_major=1, hw_minor=0, fw_patch=0,
+                    group_id=0, unique_id=0, board_type_high=0x6C)
+    assert p[0x10] == 0x6C
 
 def test_board_type_low_byte_is_hw_major():
     p = margay(hw_major=3)
     assert p[0x11] == 3
 
 def test_group_id_big_endian():
-    p = build_page0("Margay", hw_major=3, hw_minor=0, fw_patch=0, group_id=0x0102, unique_id=0)
+    p = build_page0("Margay", hw_major=3, hw_minor=0, fw_patch=0,
+                    group_id=0x0102, unique_id=0, board_type_high=0x4D)
     assert p[0x12] == 0x01
     assert p[0x13] == 0x02
 
 def test_unique_id_big_endian():
-    p = build_page0("Margay", hw_major=3, hw_minor=0, fw_patch=0, group_id=0, unique_id=0x002A)
+    p = build_page0("Margay", hw_major=3, hw_minor=0, fw_patch=0,
+                    group_id=0, unique_id=0x002A, board_type_high=0x4D)
     assert p[0x14] == 0x00
     assert p[0x15] == 0x2A
 
@@ -84,7 +95,7 @@ def test_i2c_address_default():
 
 def test_i2c_address_override():
     p = build_page0("Walrus", hw_major=2, hw_minor=0, fw_patch=0,
-                    group_id=0, unique_id=0, i2c_address=0x57)
+                    group_id=0, unique_id=0, board_type_high=0x57, i2c_address=0x57)
     assert p[0x1F] == 0x57
 
 def test_output_is_32_bytes():
@@ -95,15 +106,18 @@ def test_output_is_32_bytes():
 
 def test_rejects_hw_major_out_of_range():
     with pytest.raises(ValueError):
-        build_page0("Margay", hw_major=256, hw_minor=0, fw_patch=0, group_id=0, unique_id=0)
+        build_page0("Margay", hw_major=256, hw_minor=0, fw_patch=0,
+                    group_id=0, unique_id=0, board_type_high=0x4D)
 
 def test_rejects_group_id_out_of_range():
     with pytest.raises(ValueError):
-        build_page0("Margay", hw_major=1, hw_minor=0, fw_patch=0, group_id=0x10000, unique_id=0)
+        build_page0("Margay", hw_major=1, hw_minor=0, fw_patch=0,
+                    group_id=0x10000, unique_id=0, board_type_high=0x4D)
 
 def test_rejects_unique_id_out_of_range():
     with pytest.raises(ValueError):
-        build_page0("Margay", hw_major=1, hw_minor=0, fw_patch=0, group_id=0, unique_id=0x10000)
+        build_page0("Margay", hw_major=1, hw_minor=0, fw_patch=0,
+                    group_id=0, unique_id=0x10000, board_type_high=0x4D)
 
 
 # --- verify_page0 ---

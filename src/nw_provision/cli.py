@@ -40,6 +40,7 @@ def write(device, hw_version, fw_patch, group_id, unique_id, i2c_address,
         fw_patch=fw_patch,
         group_id=group_id,
         unique_id=unique_id,
+        board_type_high=dev.board_type_high,
         i2c_address=addr,
     )
 
