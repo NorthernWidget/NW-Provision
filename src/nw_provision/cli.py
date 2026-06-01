@@ -2,7 +2,7 @@ import click
 from .avrdude import AvrdudeError, patch_eeprom, read_eeprom, write_eeprom
 from .devices import DEVICES
 from .page0 import build_page0, verify_page0
-from .registry import NWRegistry, RegistryError
+from .registry import NWRegistry, RegistryError, _parse_hex
 
 _PROGRAMMABLE = sorted(k for k, v in DEVICES.items() if v.has_mcu)
 
@@ -185,6 +185,52 @@ def read(device, programmer, port, part):
         for msg in errors:
             click.echo(f"FAIL: {msg}", err=True)
         raise SystemExit(1)
+
+
+@main.command(name="list")
+@click.option("--device",      required=True, type=click.Choice(sorted(DEVICES)), help="Device name")
+@click.option("--registry",    "registry_path", default=None, envvar="NW_REGISTRY_PATH",
+              help="Path to NW-Registry directory (or set NW_REGISTRY_PATH)")
+@click.option("--board-type",  "board_type_str", default=None,
+              help="Filter by board_type, e.g. 0x4D03")
+def list_units(device, registry_path, board_type_str):
+    """List units for a device from the registry."""
+    reg = _resolve_registry(registry_path)
+    if reg is None:
+        raise click.UsageError("--registry or NW_REGISTRY_PATH is required")
+
+    board_type_filter = None
+    if board_type_str:
+        board_type_filter = _parse_int(board_type_str, "--board-type")
+
+    rows = reg.list_units(device, board_type=board_type_filter)
+
+    if not rows:
+        click.echo(f"No units found for {device}"
+                   + (f" board_type {board_type_str}" if board_type_str else "") + ".")
+        return
+
+    col_w = [10, 10, 13, 10, 20, 0]
+    headers = ["board_type", "group_id", "individual_id", "hw_version", "location", "notes"]
+    header_line = "  ".join(h.ljust(col_w[i]) if col_w[i] else h for i, h in enumerate(headers))
+    click.echo(f"  {header_line}")
+    click.echo("  " + "-" * len(header_line))
+    for row in rows:
+        cells = [row.get(h, "") for h in headers]
+        line = "  ".join(c.ljust(col_w[i]) if col_w[i] else c for i, c in enumerate(cells))
+        click.echo(f"  {line}")
+
+    next_id = reg.next_individual_id(device, board_type_filter or _infer_board_type(device, rows))
+    click.echo(f"\n  {len(rows)} unit{'s' if len(rows) != 1 else ''} — next ID: 0x{next_id:04X}")
+
+
+def _infer_board_type(device: str, rows: list[dict]) -> int:
+    """Return the most common board_type in rows, or 0 if rows is empty."""
+    if not rows:
+        return 0
+    from collections import Counter
+    counts = Counter(_parse_hex(r["board_type"]) for r in rows)
+    return counts.most_common(1)[0][0]
 
 
 @main.command()

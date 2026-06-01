@@ -142,6 +142,51 @@ def test_location_notes_written_to_registry(tmp_path):
     assert rows[0]["notes"] == "bench test"
 
 
+# --- list subcommand ---
+
+def test_list_shows_units(tmp_path):
+    reg = make_registry(tmp_path, units={"Margay": [
+        ["0x4D03", "0x4E57", "0x0001", "0x0000", "3.0.0", "Iowa", "bench"],
+        ["0x4D03", "0x4E57", "0x0002", "0x0000", "3.0.0", "Alaska", ""],
+    ]})
+    runner = CliRunner()
+    result = runner.invoke(main, ["list", "--device", "Margay", "--registry", str(reg)])
+    assert result.exit_code == 0, result.output
+    assert "0x0001" in result.output
+    assert "0x0002" in result.output
+    assert "Iowa" in result.output
+    assert "2 units" in result.output
+    assert "0x0003" in result.output  # next ID
+
+
+def test_list_empty(tmp_path):
+    reg = make_registry(tmp_path, units={"Margay": []})
+    runner = CliRunner()
+    result = runner.invoke(main, ["list", "--device", "Margay", "--registry", str(reg)])
+    assert result.exit_code == 0
+    assert "No units found" in result.output
+
+
+def test_list_board_type_filter(tmp_path):
+    reg = make_registry(tmp_path, units={"Margay": [
+        ["0x4D02", "0x4E57", "0x0001", "0x0000", "2.0.0", "", ""],
+        ["0x4D03", "0x4E57", "0x0002", "0x0000", "3.0.0", "", ""],
+    ]})
+    runner = CliRunner()
+    result = runner.invoke(main, [
+        "list", "--device", "Margay", "--registry", str(reg), "--board-type", "0x4D03",
+    ])
+    assert result.exit_code == 0
+    assert "0x0002" in result.output
+    assert "0x0001" not in result.output
+
+
+def test_list_requires_registry():
+    runner = CliRunner()
+    result = runner.invoke(main, ["list", "--device", "Margay"])
+    assert result.exit_code != 0
+
+
 # --- missing --programmer without --dry-run ---
 
 def test_write_requires_programmer_without_dry_run():
