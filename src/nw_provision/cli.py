@@ -1,4 +1,5 @@
 import click
+from .avrdude import AvrdudeError, patch_eeprom, read_eeprom, write_eeprom
 from .devices import DEVICES
 from .page0 import build_page0, verify_page0
 
@@ -17,8 +18,12 @@ def main():
 @click.option("--id",          "unique_id", required=True, type=int, help="Unique ID (0–65535)")
 @click.option("--i2c-address", default=None, type=int,
               help="I2C address override (default: device default from table)")
+@click.option("--programmer",  default=None, help="avrdude programmer ID, e.g. usbasp, avrisp2")
+@click.option("--port",        default=None, help="Programmer port, e.g. /dev/ttyUSB0 (omit if not needed)")
+@click.option("--part",        default=None, help="avrdude part override (default: from device table)")
 @click.option("--dry-run",     is_flag=True, help="Print Page 0 bytes; do not write to hardware")
-def write(device, hw_version, fw_patch, group_id, unique_id, i2c_address, dry_run):
+def write(device, hw_version, fw_patch, group_id, unique_id, i2c_address,
+          programmer, port, part, dry_run):
     """Build and write a Page 0 identity block to a NorthernWidget board."""
     try:
         hw_major, hw_minor = (int(x) for x in hw_version.split("."))
@@ -52,7 +57,37 @@ def write(device, hw_version, fw_patch, group_id, unique_id, i2c_address, dry_ru
         click.echo("\n[dry run — no hardware written]")
         return
 
-    click.echo("\n[avrdude write not yet implemented]")
+    if not programmer:
+        raise click.UsageError("--programmer is required (e.g. --programmer usbasp)")
+
+    avrdude_part = part or dev.avrdude_part
+
+    try:
+        click.echo(f"\nReading EEPROM via {programmer} ({avrdude_part})...")
+        eeprom = read_eeprom(programmer, avrdude_part, port)
+
+        if len(eeprom) != dev.eeprom_size:
+            raise click.ClickException(
+                f"Read {len(eeprom)} bytes but {device} expects {dev.eeprom_size}"
+            )
+
+        patched = patch_eeprom(eeprom, page0)
+
+        click.echo("Writing patched EEPROM...")
+        write_eeprom(programmer, avrdude_part, patched, port)
+
+        click.echo("Verifying readback...")
+        readback = read_eeprom(programmer, avrdude_part, port)
+        ok, errors = verify_page0(readback[-32:])
+        if not ok:
+            for msg in errors:
+                click.echo(f"VERIFY FAIL: {msg}", err=True)
+            raise SystemExit(1)
+
+        click.echo("OK — Page 0 verified on device.")
+
+    except AvrdudeError as e:
+        raise click.ClickException(str(e))
 
 
 @main.command()
