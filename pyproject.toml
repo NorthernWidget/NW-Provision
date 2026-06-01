@@ -7,10 +7,34 @@ name = "nw-provision"
 version = "0.1.0"
 description = "Write NW-Device-Specification Page 0 identity blocks to NorthernWidget boards via avrdude"
 license = {text = "GPL-3.0-or-later"}
+authors = [
+    {name = "Northern Widget LLC", email = "andy@northernwidget.com"},
+]
+readme = "README.md"
 requires-python = ">=3.9"
+keywords = ["avrdude", "eeprom", "arduino", "embedded", "northern-widget"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Embedded Systems",
+]
 dependencies = [
     "click>=8.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/NorthernWidget/NW-Provision"
+Repository = "https://github.com/NorthernWidget/NW-Provision"
+"Bug Tracker" = "https://github.com/NorthernWidget/NW-Provision/issues"
 
 [project.optional-dependencies]
 dev = ["pytest"]
