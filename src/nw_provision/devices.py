@@ -18,7 +18,7 @@ class Device:
 DEVICES = {
     #           name       mcu             eeprom  part      i2c    bt_high  has_mcu
     "Margay":  Device("Margay",  "ATmega1284P", 4096, "m1284p", 0xFF,  0x4D),
-    "Okapi":   Device("Okapi",   "ATmega1284P", 4096, "m1284p", 0xFF,  0x99),
+    "Okapi":   Device("Okapi",   "ATmega1284P", 4096, "m1284p", 0xFF,  0x4F),          # 'O'; 0x99 = Resnik prototype (pre-production)
     "Apis":    Device("Apis",    "ATtiny1634",   256, "t1634",  0x41,  0x6C),
     "Haar":    Device("Haar",    "ATtiny1634",   256, "t1634",  0x48,  0x48),
     "Walrus":  Device("Walrus",  "ATtiny1634",   256, "t1634",  0x57,  0x57),
