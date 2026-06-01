@@ -83,7 +83,7 @@ Accepts 32 space-separated hex bytes and validates them offline (no hardware nee
 | Device  | MCU          | EEPROM | avrdude part | I2C address | board_type high byte |
 |---------|-------------|--------|-------------|-------------|----------------------|
 | Margay  | ATmega1284P | 4096 B | m1284p      | —           | 0x4D |
-| Okapi   | ATmega1284P | 4096 B | m1284p      | —           | 0x99 |
+| Okapi   | ATmega1284P | 4096 B | m1284p      | —           | 0x4F |
 | Apis    | ATtiny1634  | 256 B  | t1634       | 0x41        | 0x6C |
 | Haar    | ATtiny1634  | 256 B  | t1634       | 0x48        | 0x48 |
 | Walrus  | ATtiny1634  | 256 B  | t1634       | 0x57        | 0x57 |
