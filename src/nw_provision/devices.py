@@ -19,9 +19,9 @@ DEVICES = {
     #           name       mcu             eeprom  part      i2c    bt_high  has_mcu
     "Margay":  Device("Margay",  "ATmega1284P", 4096, "m1284p", 0xFF,  0x4D),
     "Okapi":   Device("Okapi",   "ATmega1284P", 4096, "m1284p", 0xFF,  0x4F),          # 'O'; 0x99 = Resnik prototype (pre-production)
-    "Apis":    Device("Apis",    "ATtiny1634",   256, "t1634",  0x41,  0x6C),
+    "Apis":    Device("Apis",    "ATtiny1634",   256, "t1634",  0x41,  0x41),  # 'A'; legacy bt_high was 0x6C (Symbiont-LiDAR)
     "Haar":    Device("Haar",    "ATtiny1634",   256, "t1634",  0x48,  0x48),
     "Walrus":  Device("Walrus",  "ATtiny1634",   256, "t1634",  0x57,  0x57),
-    "Libelle": Device("Libelle", "ATtiny841",    512, "t841",   0x4C,  0x23),
-    "Liasis":  Device("Liasis",  "",               0, "",       0xFF,  0x24, False),
+    "Libelle": Device("Libelle", "ATtiny841",    512, "t841",   0x4C,  0x4C),  # 'L'; legacy bt_high was 0x23 (Dyson SW)
+    "Liasis":  Device("Liasis",  "",               0, "",       0xFF,  0x6C, False),  # 'l'; legacy bt_high was 0x24 (Dyson LW)
 }
