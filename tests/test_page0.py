@@ -1,5 +1,5 @@
 import pytest
-from nw_provision.page0 import build_page0, crc8, verify_page0, PAGE0_SIZE, SCHEMA_1
+from nw_provision.page0 import build_page0, crc8, verify_page0, PAGE0_SIZE, SCHEMA_1, MAGIC
 
 
 def margay(**kwargs):
@@ -90,7 +90,7 @@ def test_unique_id_big_endian():
 
 def test_reserved_bytes_zero():
     p = margay()
-    reserved = list(range(0x0B, 0x10)) + [0x16, 0x17] + list(range(0x18, 0x1E))
+    reserved = list(range(0x0B, 0x10)) + [0x16, 0x17] + list(range(0x18, 0x1D))
     for i in reserved:
         assert p[i] == 0x00, f"byte 0x{i:02X} should be 0x00"
 
@@ -157,3 +157,16 @@ def test_verify_schema0():
 def test_verify_wrong_length():
     ok, errors = verify_page0(b"\x01" * 16)
     assert not ok
+
+
+def test_magic_byte():
+    p = build_page0("Apis", 0, 1, 0, 1, 1, 0x4100)
+    assert p[0x1D] == MAGIC == 0x4E
+
+
+def test_verify_bad_magic():
+    p = bytearray(build_page0("Apis", 0, 1, 0, 1, 1, 0x4100))
+    p[0x1D] = 0x00
+    p[0x1E] = crc8(bytes(p[0x00:0x1E]))   # keep the CRC valid so only the magic check fires
+    ok, errors = verify_page0(bytes(p))
+    assert not ok and any("magic" in e for e in errors)

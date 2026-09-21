@@ -16,13 +16,14 @@ Layout (Schema 1):
   0x14–0x15   Unique ID (big-endian uint16)
   0x16–0x17   FirmwareID legacy (0x00)
   0x18–0x1C   Reserved (0x00)
-  0x1D        Magic byte (0x00, purpose TBD)
+  0x1D        Magic byte 0x4E ('N', Northern Widget)
   0x1E        CRC-8 over bytes 0x00–0x1D
   0x1F        I2C address (0xFF = use device default)
 """
 
 PAGE0_SIZE = 32
 SCHEMA_1 = 0x01
+MAGIC = 0x4E  # ASCII 'N'; NW-Device-Specification Page 0 Block 3
 
 
 def crc8(data: bytes) -> int:
@@ -82,7 +83,7 @@ def build_page0(
 
     # Block 3: integrity + admin
     # 0x18–0x1C: reserved = 0x00
-    # 0x1D: magic byte = 0x00 (TBD)
+    buf[0x1D] = MAGIC
     buf[0x1E] = crc8(bytes(buf[0x00:0x1E]))
     buf[0x1F] = i2c_address & 0xFF
 
@@ -103,6 +104,8 @@ def verify_page0(data: bytes) -> tuple[bool, list[str]]:
         errors.append("schema byte is 0x00 (Schema 0 legacy — not auto-detectable)")
     elif data[0x00] != SCHEMA_1:
         errors.append(f"unknown schema byte 0x{data[0x00]:02X}")
+    if data[0x1D] != MAGIC:
+        errors.append(f"magic byte is 0x{data[0x1D]:02X}, expected 0x{MAGIC:02X}")
     expected_crc = crc8(data[0x00:0x1E])
     if data[0x1E] != expected_crc:
         errors.append(f"CRC mismatch: stored 0x{data[0x1E]:02X}, computed 0x{expected_crc:02X}")
