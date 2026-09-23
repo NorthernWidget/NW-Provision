@@ -10,7 +10,8 @@ Layout (Schema 1):
   0x08        HW major
   0x09        HW minor
   0x0A        FW patch  (NW combined-repo convention; 0x0B–0x0D = 0x00)
-  0x0B–0x0F   Reserved (0x00)
+  0x0B–0x0D   Firmware version, separate-repo convention (0x00 here)
+  0x0E–0x0F   Reserved (0x00)
   0x10–0x11   Board type (2 bytes, from NW-Registry board_types.csv)
   0x12–0x13   Group ID (big-endian uint16)
   0x14–0x15   Unique ID (big-endian uint16)
@@ -70,7 +71,7 @@ def build_page0(
     buf[0x08] = hw_major
     buf[0x09] = hw_minor
     buf[0x0A] = fw_patch
-    # 0x0B–0x0F: stay 0x00
+    # 0x0B–0x0F: stay 0x00 (0x0B–0x0D are the separate-repo firmware version, unused by NW)
 
     # Block 2: serial number
     buf[0x10] = (board_type >> 8) & 0xFF
