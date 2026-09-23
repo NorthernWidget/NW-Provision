@@ -1,7 +1,9 @@
 import click
-from .avrdude import AvrdudeError, page0_of, patch_eeprom, read_eeprom, write_eeprom
+from .avrdude import (AvrdudeError, page0_of, page1_of, patch_eeprom, patch_page1,
+                      read_eeprom, write_eeprom)
 from .devices import DEVICES
 from .page0 import build_page0, verify_page0
+from .page1 import PAGE1_BUILDERS, describe_page1
 from .registry import NWRegistry, RegistryError, _parse_hex
 
 _PROGRAMMABLE = sorted(k for k, v in DEVICES.items() if v.has_mcu)
@@ -28,7 +30,7 @@ def _resolve_registry(registry_path: str | None) -> NWRegistry | None:
 @click.group()
 @click.version_option()
 def main():
-    """NW-Provision: write NW-Device-Specification Page 0 identity blocks to NorthernWidget boards."""
+    """NW-Provision: write NW-Device-Specification Page 0 identity blocks (and a data logger's Page 1 calibration) to NorthernWidget boards."""
 
 
 @main.command()
@@ -48,10 +50,17 @@ def main():
 @click.option("--part",        default=None, help="avrdude part override (default: from device table)")
 @click.option("--location",    default="", help="Physical location note written to registry")
 @click.option("--notes",       default="", help="Freeform notes written to registry")
-@click.option("--dry-run",     is_flag=True, help="Print Page 0 bytes; do not write to hardware")
+@click.option("--no-page1",    is_flag=True,
+              help="Leave Page 1 (calibration) as found on a data logger instead of writing it")
+@click.option("--dry-run",     is_flag=True, help="Print the Page 0 (and Page 1) bytes; do not write to hardware")
 def write(device, hw_version, fw_patch, group_id_str, unique_id_str, registry_path,
-          i2c_address, programmer, port, part, location, notes, dry_run):
-    """Build and write a Page 0 identity block to a NorthernWidget board."""
+          i2c_address, programmer, port, part, location, notes, no_page1, dry_run):
+    """Build and write a Page 0 identity block to a NorthernWidget board.
+
+    A data logger (Margay, Okapi) also gets its Page 1 calibration, built from
+    --hw-version (major = board model), unless --no-page1 is given. A sensor's
+    Page 1 belongs to its firmware and is left as found.
+    """
     try:
         hw_major, hw_minor = (int(x) for x in hw_version.split("."))
     except ValueError:
@@ -84,6 +93,15 @@ def write(device, hw_version, fw_patch, group_id_str, unique_id_str, registry_pa
 
     addr = i2c_address if i2c_address is not None else dev.i2c_address
 
+    # Page 1: a data logger's calibration, from the board model (hw_major)
+    page1 = None
+    if dev.page1 is not None and not no_page1:
+        try:
+            page1 = PAGE1_BUILDERS[dev.page1](hw_version)
+        except ValueError as e:
+            raise click.BadParameter(f"{e} (pass --no-page1 to leave Page 1 as found)",
+                                     param_hint="--hw-version")
+
     page0 = build_page0(
         device_name=device,
         hw_major=hw_major,
@@ -102,8 +120,19 @@ def write(device, hw_version, fw_patch, group_id_str, unique_id_str, registry_pa
     click.echo(f"Unique ID:   0x{unique_id:04X}")
     click.echo(f"I2C address: 0x{addr:02X}" + (" [device default]" if addr == 0xFF else ""))
     click.echo(f"EEPROM:      {dev.eeprom_size} bytes; Page 0 at offset {dev.eeprom_size - 64} (0x{dev.eeprom_size - 64:04X}), Page 1 (calibration) above it")
+    if page1 is not None:
+        click.echo(f"Page 1:      {dev.page1} layout, from HW version {hw_major}.{hw_minor}")
+    elif dev.page1 is not None:
+        click.echo("Page 1:      left as found (--no-page1)")
+    else:
+        click.echo("Page 1:      left as found (a sensor's firmware owns its calibration)")
     click.echo("")
     _print_page0(page0)
+    if page1 is not None:
+        click.echo("")
+        _print_page1(page1)
+        click.echo("")
+        _print_description(describe_page1(page1, dev.page1))
 
     if dry_run:
         click.echo("\n[dry run — no hardware written]")
@@ -124,6 +153,8 @@ def write(device, hw_version, fw_patch, group_id_str, unique_id_str, registry_pa
             )
 
         patched = patch_eeprom(eeprom, page0)
+        if page1 is not None:
+            patched = patch_page1(patched, page1)
 
         click.echo("Writing patched EEPROM...")
         write_eeprom(programmer, avrdude_part, patched, port)
@@ -135,8 +166,12 @@ def write(device, hw_version, fw_patch, group_id_str, unique_id_str, registry_pa
             for msg in errors:
                 click.echo(f"VERIFY FAIL: {msg}", err=True)
             raise SystemExit(1)
+        if page1 is not None and page1_of(readback) != page1:
+            click.echo("VERIFY FAIL: Page 1 readback differs from the bytes written", err=True)
+            raise SystemExit(1)
 
-        click.echo("OK — Page 0 verified on device.")
+        click.echo("OK — Page 0 verified on device." if page1 is None
+                   else "OK — Page 0 and Page 1 verified on device.")
 
     except AvrdudeError as e:
         raise click.ClickException(str(e))
@@ -265,10 +300,31 @@ _BLOCK_LABELS = [
 ]
 
 
-def _print_page0(data: bytes) -> None:
+_PAGE1_LABELS = [
+    "Page 1   calibration",
+    "",
+    "",
+    "",
+]
+
+
+def _print_page(data: bytes, base: int, labels: list[str]) -> None:
     for block in range(4):
         offset = block * 8
         row = data[offset : offset + 8]
         hex_str = " ".join(f"{b:02X}" for b in row)
         ascii_str = "".join(chr(b) if 0x20 <= b < 0x7F else "." for b in row)
-        click.echo(f"  0x{offset:02X}  {hex_str}  |{ascii_str}|  {_BLOCK_LABELS[block]}")
+        click.echo(f"  0x{base + offset:02X}  {hex_str}  |{ascii_str}|  {labels[block]}".rstrip())
+
+
+def _print_page0(data: bytes) -> None:
+    _print_page(data, 0x00, _BLOCK_LABELS)
+
+
+def _print_page1(data: bytes) -> None:
+    _print_page(data, 0x20, _PAGE1_LABELS)
+
+
+def _print_description(text: str) -> None:
+    for line in text.splitlines():
+        click.echo(f"  {line}")
