@@ -1,8 +1,8 @@
 # NW-Provision
 
-Write [NW-Device-Specification](https://github.com/NorthernWidget/NW-Device-Specification) **Page 0** identity blocks to NorthernWidget boards via avrdude.
+Write [NW-Device-Specification](https://github.com/NorthernWidget/NW-Device-Specification) **Page 0** identity blocks, and a data logger's **Page 1** calibration, to NorthernWidget boards via avrdude.
 
-NW-Provision replaces the manual `MargaySetup.ino` workflow (flash setup sketch → serial interaction → reflash). It reads the existing EEPROM, writes a freshly built identity block into Page 0 (the 32 bytes at `length-64`; Page 1, the device's calibration, sits above it and is left as found), writes the image back, and verifies the readback, without disturbing the firmware already on the board.
+NW-Provision replaces the manual `MargaySetup.ino` workflow (flash setup sketch → serial interaction → reflash). It reads the existing EEPROM, writes a freshly built identity block into Page 0 (the 32 bytes at `length-64`), writes the image back, and verifies the readback, without disturbing the firmware already on the board. Page 1 (the 32 bytes above Page 0) holds the device's calibration. For a data logger (Margay, Okapi) NW-Provision writes it from the board model. For a sensor it leaves Page 1 as found: the sensor's firmware owns it (Apis stores its zero there).
 
 ## Installation
 
@@ -28,6 +28,10 @@ nw-provision write \
 `--id` accepts a decimal integer, a `0x`-prefixed hex value, or `auto`.  
 `auto` queries the registry for the next available ID and asks for confirmation before writing.
 
+For a Margay or an Okapi, `write` also builds Page 1 (calibration) and writes it beside Page 0. The major number of `--hw-version` is the board model: `3.0` gives model 3, `2.1` and `2.2` give model 2 (Margay_Library maps `MODEL_2v0`, `MODEL_2v1`, and `MODEL_2v2` to the same model), and `0.0` gives model 0. A Margay model outside 0–3 is refused unless you pass `--no-page1`. The bytes written decode to the constants built into Margay_Library (`Margay.h`). A freshly provisioned board therefore measures exactly as an unprovisioned one, and a per-board calibration can replace those constants later. Okapi_Library stores no calibration yet, and an Okapi gets a blank Page 1 (32 × `0xFF`). Pass `--no-page1` to leave Page 1 as found on either logger. A sensor's Page 1 is never written.
+
+The readback verifies both pages: Page 0 by its CRC-8 and magic byte, Page 1 byte for byte against what was written.
+
 Full options:
 
 | Option | Default | Description |
@@ -44,7 +48,8 @@ Full options:
 | `--part` | from device table | avrdude part override |
 | `--location` | `""` | Deployment location note written to registry |
 | `--notes` | `""` | Freeform notes written to registry |
-| `--dry-run` | — | Print Page 0 bytes; do not write to hardware |
+| `--no-page1` | — | Leave Page 1 (calibration) as found on a data logger instead of writing it |
+| `--dry-run` | — | Print the Page 0 (and Page 1) bytes; do not write to hardware |
 
 Set `NW_REGISTRY_PATH` in your environment to avoid passing `--registry` every time:
 
@@ -68,7 +73,7 @@ Displays a formatted table of all units for a device from the registry, with a s
 nw-provision read --device Margay --programmer usbasp
 ```
 
-Reads the full EEPROM, extracts Page 0 (the 32 bytes at `length-64`; Page 1, the device's calibration, sits above it), prints them in a hex/ASCII table, and reports whether Page 0 passes Schema 1 validation.
+Reads the full EEPROM, extracts Page 0 (the 32 bytes at `length-64`) and Page 1 (the 32 above it), prints both in a hex/ASCII table, and reports whether Page 0 passes Schema 1 validation. Under the Page 1 bytes it prints their decoding. For a Margay that is the battery divider, the four Steinhart–Hart coefficients, and the battery thresholds (the layout below). Any device's page reads `blank` when every byte is `0xFF`. A sensor's layout belongs to its firmware, and `read` reports only whether the page holds data.
 
 ### `verify` — validate raw hex bytes
 
@@ -112,6 +117,45 @@ Offset  Bytes  Contents
 ```
 
 Physical location: `EEPROM[length-64]` through `EEPROM[length-33]`; Page 1 (calibration) occupies `EEPROM[length-32]` through `EEPROM[length-1]`. The two are one 64-byte stored image in bus order (NW-Device-Specification, renumbered 2026-09-23).
+
+## Page 1 layout (Margay calibration)
+
+Bus addresses `0x20`–`0x3F`. The layout is the Margay appendix of NW-Device-Specification. Margay_Library reads the page at boot and falls back to its built-in constants when the page is blank.
+
+```
+Offset       Bytes  Contents
+0x20–0x21    2      Battery divider × 1000, uint16 little-endian
+0x22–0x25    4      Thermistor Steinhart–Hart A, float32 little-endian
+0x26–0x29    4      Thermistor Steinhart–Hart B, float32 little-endian
+0x2A–0x2D    4      Thermistor Steinhart–Hart C, float32 little-endian
+0x2E–0x31    4      Thermistor Steinhart–Hart D, float32 little-endian
+0x32–0x33    2      Battery low threshold, uint16, 0.01 V (330 = 3.30 V)
+0x34         1      Battery warning, uint8, percent
+0x35–0x3F    11     Reserved (0x00)
+```
+
+The values NW-Provision writes are those in `Margay_Library/src/Margay.h` and the constructor in `Margay.cpp`:
+
+| Field | Model 0 | Models 1, 2, 3 | Source |
+|-------|---------|----------------|--------|
+| Battery divider | 9.0 (`9000`) | 2.0 (`2000`) | `Margay.cpp` constructor, `BatteryDivider` per model |
+| Steinhart–Hart A | 0.003354016 | 0.003354016 | `Margay.h` |
+| Steinhart–Hart B | 0.0003074038 | 0.0003074038 | `Margay.h` |
+| Steinhart–Hart C | 1.019153E-05 | 1.019153E-05 | `Margay.h` |
+| Steinhart–Hart D | 9.093712E-07 | 9.093712E-07 | `Margay.h` |
+| Battery low threshold | 3.30 V (`330`) | 3.30 V (`330`) | `Margay.h`, `BatVoltageError` |
+| Battery warning | 50 % | 50 % | `Margay.h`, `BatPercentageWarning` |
+
+Model 3.0 in full, as `nw-provision write --device Margay --hw-version 3.0 --id 1 --dry-run` prints it:
+
+```
+0x20  D0 07 0D CF 5B 3B 0A 2B
+0x28  A1 39 4A FC 2A 37 83 1B
+0x30  74 35 4A 01 32 00 00 00
+0x38  00 00 00 00 00 00 00 00
+```
+
+An Okapi's Page 1 is written blank (32 × `0xFF`) until Okapi_Library reads a calibration from it.
 
 ## NW-Registry integration
 
