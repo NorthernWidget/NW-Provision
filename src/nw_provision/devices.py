@@ -13,12 +13,14 @@ class Device:
     board_type_high: int    # high byte of board_type (Page 0 offset 0x10);
                             # from NW-Registry board_types.csv — NOT always ASCII of name[0]
     has_mcu: bool = True    # False = no onboard MCU; avrdude write not possible
+    page1: str | None = None  # Page 1 layout provisioning writes (page1.PAGE1_BUILDERS key);
+                            # None = a sensor: its firmware owns Page 1 and provisioning leaves it as found
 
 
 DEVICES = {
     #           name       mcu             eeprom  part      i2c    bt_high  has_mcu
-    "Margay":  Device("Margay",  "ATmega1284P", 4096, "m1284p", 0xFF,  0x4D),
-    "Okapi":   Device("Okapi",   "ATmega1284P", 4096, "m1284p", 0xFF,  0x4F),          # 'O'; 0x99 = Resnik prototype (pre-production)
+    "Margay":  Device("Margay",  "ATmega1284P", 4096, "m1284p", 0xFF,  0x4D, page1="margay"),  # calibration from the board model
+    "Okapi":   Device("Okapi",   "ATmega1284P", 4096, "m1284p", 0xFF,  0x4F, page1="blank"),   # 'O'; 0x99 = Resnik prototype (pre-production); Okapi_Library stores no calibration yet
     "Apis":    Device("Apis",    "ATtiny1634",   256, "t1634",  0x41,  0x41),  # 'A'; legacy bt_high was 0x6C (Symbiont-LiDAR)
     "Haar":    Device("Haar",    "ATtiny1634",   256, "t1634",  0x48,  0x48),
     "Walrus":  Device("Walrus",  "ATtiny1634",   256, "t1634",  0x57,  0x57),

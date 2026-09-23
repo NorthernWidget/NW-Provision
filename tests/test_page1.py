@@ -148,3 +148,19 @@ def test_describe_other_layout_not_decoded():
 def test_describe_wrong_length():
     with pytest.raises(ValueError):
         describe_page1(bytes(16))
+
+
+# --- devices: which devices carry a Page 1 builder ---
+
+def test_devices_page1_layouts():
+    from nw_provision.devices import DEVICES
+    assert DEVICES["Margay"].page1 == LAYOUT_MARGAY
+    assert DEVICES["Okapi"].page1 == LAYOUT_BLANK
+    for sensor in ("Apis", "Haar", "Walrus", "Libelle", "Liasis"):
+        assert DEVICES[sensor].page1 is None, sensor
+
+def test_device_layouts_have_builders():
+    from nw_provision.devices import DEVICES
+    for dev in DEVICES.values():
+        if dev.page1 is not None:
+            assert dev.page1 in PAGE1_BUILDERS, dev.name
