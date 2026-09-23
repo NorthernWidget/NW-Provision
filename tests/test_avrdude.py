@@ -4,7 +4,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nw_provision.avrdude import AvrdudeError, patch_eeprom, read_eeprom, write_eeprom
+from nw_provision.avrdude import (
+    AvrdudeError, page0_of, page1_of, patch_eeprom, patch_page1, read_eeprom, write_eeprom,
+)
 
 
 # --- patch_eeprom (pure function) ---
@@ -34,6 +36,40 @@ def test_patch_rejects_wrong_page0_size():
 def test_patch_rejects_short_eeprom():
     with pytest.raises(ValueError, match="too short"):
         patch_eeprom(bytes(16), bytes(32))
+
+
+# --- patch_page1 / page0_of / page1_of (pure functions) ---
+
+def test_patch_page1_writes_the_top_32():
+    eeprom = bytes(range(256))
+    page1 = bytes([0xCD] * 32)
+    result = patch_page1(eeprom, page1)
+    assert result[-32:] == page1
+    assert result[-64:-32] == eeprom[-64:-32]   # Page 0 untouched
+    assert result[:-64] == eeprom[:-64]
+    assert len(result) == 256
+
+def test_patch_page1_rejects_wrong_size():
+    with pytest.raises(ValueError, match="32 bytes"):
+        patch_page1(bytes(256), bytes(33))
+
+def test_patch_page1_rejects_short_eeprom():
+    with pytest.raises(ValueError, match="too short"):
+        patch_page1(bytes(48), bytes(32))
+
+def test_patch_both_pages_compose():
+    eeprom = bytes(range(256))
+    page0 = bytes([0xAB] * 32)
+    page1 = bytes([0xCD] * 32)
+    result = patch_page1(patch_eeprom(eeprom, page0), page1)
+    assert page0_of(result) == page0
+    assert page1_of(result) == page1
+    assert result[:-64] == eeprom[:-64]
+
+def test_page0_of_and_page1_of_slices():
+    eeprom = bytes(range(256))
+    assert page0_of(eeprom) == bytes(range(192, 224))
+    assert page1_of(eeprom) == bytes(range(224, 256))
 
 
 # --- read_eeprom / write_eeprom (subprocess mocked) ---

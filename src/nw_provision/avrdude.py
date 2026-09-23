@@ -73,6 +73,25 @@ def patch_eeprom(eeprom_data: bytes, page0: bytes) -> bytes:
     return eeprom_data[:-PAGE0_FROM_END] + page0 + eeprom_data[-32:]
 
 
+def patch_page1(eeprom_data: bytes, page1: bytes) -> bytes:
+    """Return a copy of eeprom_data with Page 1 written at EEPROM[length-32:length].
+
+    Only a data logger's Page 1 is written by provisioning (Margay: the
+    calibration its library reads at boot). A sensor's Page 1 belongs to its
+    firmware, and the CLI never calls this for one.
+    """
+    if len(page1) != 32:
+        raise ValueError(f"page1 must be 32 bytes, got {len(page1)}")
+    if len(eeprom_data) < PAGE0_FROM_END:
+        raise ValueError(f"EEPROM data too short: {len(eeprom_data)} bytes")
+    return eeprom_data[:-32] + page1
+
+
 def page0_of(eeprom_data: bytes) -> bytes:
     """The Page 0 bytes of a full EEPROM image."""
     return eeprom_data[-PAGE0_FROM_END:-32]
+
+
+def page1_of(eeprom_data: bytes) -> bytes:
+    """The Page 1 bytes of a full EEPROM image: the top 32."""
+    return eeprom_data[-32:]
