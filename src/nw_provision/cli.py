@@ -193,7 +193,7 @@ def write(device, hw_version, fw_patch, group_id_str, unique_id_str, registry_pa
 @click.option("--port",       default=None,  help="Programmer port (omit if not needed)")
 @click.option("--part",       default=None,  help="avrdude part override (default: from device table)")
 def read(device, programmer, port, part):
-    """Read and display the Page 0 identity block from a connected board."""
+    """Read and display the Page 0 identity block, then Page 1 (calibration), from a connected board."""
     dev = DEVICES[device]
     avrdude_part = part or dev.avrdude_part
 
@@ -209,8 +209,13 @@ def read(device, programmer, port, part):
         )
 
     page0 = page0_of(eeprom)
+    page1 = page1_of(eeprom)
     click.echo("")
     _print_page0(page0)
+    click.echo("")
+    _print_page1(page1)
+    click.echo("")
+    _print_description(describe_page1(page1, dev.page1))
     click.echo("")
 
     ok, errors = verify_page0(page0)

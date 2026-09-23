@@ -358,3 +358,47 @@ def test_write_page1_readback_mismatch_fails():
     assert result.exit_code == 1
     assert "VERIFY FAIL: Page 1" in result.output
 
+
+# --- read: Page 1 after Page 0 ---
+
+def test_read_margay_prints_page1_decoded():
+    from unittest.mock import patch
+    from nw_provision.page0 import build_page0
+    from nw_provision.page1 import build_margay_page1
+
+    image = bytes(4032) + build_page0("Margay", 3, 0, 0, 0, 1, 0x4D03) + build_margay_page1(3)
+    run, _ = fake_eeprom_board(image)
+    runner = CliRunner()
+    with patch("nw_provision.avrdude.subprocess.run", side_effect=run):
+        result = runner.invoke(main, ["read", "--device", "Margay", "--programmer", "usbasp"])
+    assert result.exit_code == 0, result.output
+    assert "0x20  D0 07 0D CF" in result.output
+    assert "Battery divider:     2.000" in result.output
+    assert "OK — Page 0 is valid Schema 1" in result.output
+
+
+def test_read_margay_blank_page1():
+    from unittest.mock import patch
+    from nw_provision.page0 import build_page0
+
+    image = bytes(4032) + build_page0("Margay", 3, 0, 0, 0, 1, 0x4D03) + b"\xFF" * 32
+    run, _ = fake_eeprom_board(image)
+    runner = CliRunner()
+    with patch("nw_provision.avrdude.subprocess.run", side_effect=run):
+        result = runner.invoke(main, ["read", "--device", "Margay", "--programmer", "usbasp"])
+    assert result.exit_code == 0, result.output
+    assert "blank (all 0xFF)" in result.output
+
+
+def test_read_sensor_page1_not_decoded():
+    from unittest.mock import patch
+    from nw_provision.page0 import build_page0
+
+    image = bytes(192) + build_page0("Apis", 0, 1, 0, 0, 1, 0x4100) + bytes(range(32))
+    run, _ = fake_eeprom_board(image)
+    runner = CliRunner()
+    with patch("nw_provision.avrdude.subprocess.run", side_effect=run):
+        result = runner.invoke(main, ["read", "--device", "Apis", "--programmer", "usbasp"])
+    assert result.exit_code == 0, result.output
+    assert "0x20  00 01 02 03 04 05 06 07" in result.output
+    assert "not blank: holds data this tool does not decode" in result.output
