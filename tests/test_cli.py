@@ -110,7 +110,7 @@ def test_location_notes_written_to_registry(tmp_path):
             page0 = build_page0("Walrus", hw_major=0, hw_minor=2, fw_patch=0,
                                  group_id=0, unique_id=1, board_type=0x5700)
             data = bytearray(256)  # ATtiny1634 has 256 B EEPROM
-            data[-32:] = page0
+            data[-64:-32] = page0
             with open(outfile, "wb") as f:
                 f.write(bytes(data))
         return ok_result

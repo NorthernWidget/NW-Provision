@@ -1,5 +1,5 @@
 import click
-from .avrdude import AvrdudeError, patch_eeprom, read_eeprom, write_eeprom
+from .avrdude import AvrdudeError, page0_of, patch_eeprom, read_eeprom, write_eeprom
 from .devices import DEVICES
 from .page0 import build_page0, verify_page0
 from .registry import NWRegistry, RegistryError, _parse_hex
@@ -101,7 +101,7 @@ def write(device, hw_version, fw_patch, group_id_str, unique_id_str, registry_pa
     click.echo(f"Group ID:    0x{group_id:04X}")
     click.echo(f"Unique ID:   0x{unique_id:04X}")
     click.echo(f"I2C address: 0x{addr:02X}" + (" [device default]" if addr == 0xFF else ""))
-    click.echo(f"EEPROM:      {dev.eeprom_size} bytes — Page 0 at offset {dev.eeprom_size - 32} (0x{dev.eeprom_size - 32:04X})")
+    click.echo(f"EEPROM:      {dev.eeprom_size} bytes; Page 0 at offset {dev.eeprom_size - 64} (0x{dev.eeprom_size - 64:04X}), Page 1 (calibration) above it")
     click.echo("")
     _print_page0(page0)
 
@@ -130,7 +130,7 @@ def write(device, hw_version, fw_patch, group_id_str, unique_id_str, registry_pa
 
         click.echo("Verifying readback...")
         readback = read_eeprom(programmer, avrdude_part, port)
-        ok, errors = verify_page0(readback[-32:])
+        ok, errors = verify_page0(page0_of(readback))
         if not ok:
             for msg in errors:
                 click.echo(f"VERIFY FAIL: {msg}", err=True)
@@ -173,7 +173,7 @@ def read(device, programmer, port, part):
             f"Read {len(eeprom)} bytes but {device} expects {dev.eeprom_size}"
         )
 
-    page0 = eeprom[-32:]
+    page0 = page0_of(eeprom)
     click.echo("")
     _print_page0(page0)
     click.echo("")

@@ -9,17 +9,18 @@ from nw_provision.avrdude import AvrdudeError, patch_eeprom, read_eeprom, write_
 
 # --- patch_eeprom (pure function) ---
 
-def test_patch_replaces_top_32():
+def test_patch_writes_page0_below_the_top_32():
     eeprom = bytes(range(256))
     page0 = bytes([0xAB] * 32)
     result = patch_eeprom(eeprom, page0)
-    assert result[-32:] == page0
+    assert result[-64:-32] == page0
+    assert result[-32:] == eeprom[-32:]   # Page 1, calibration, untouched
 
 def test_patch_preserves_lower_bytes():
     eeprom = bytes(range(256))
     page0 = bytes([0xAB] * 32)
     result = patch_eeprom(eeprom, page0)
-    assert result[:-32] == eeprom[:-32]
+    assert result[:-64] == eeprom[:-64]
 
 def test_patch_total_length_unchanged():
     eeprom = bytes(1024)

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 class Device:
     name: str               # up to 7 ASCII chars; written to Page 0 bytes 0x01–0x07
     mcu: str                # human-readable MCU name, e.g. "ATmega1284P"
-    eeprom_size: int        # total EEPROM bytes; Page 0 lives at eeprom_size - 32
+    eeprom_size: int        # total EEPROM bytes; Page 0 lives at eeprom_size - 64, Page 1 (calibration) at eeprom_size - 32
                             # 0 = no MCU / not yet defined
     avrdude_part: str       # avrdude -p argument; "" = no MCU / not yet defined
     i2c_address: int        # default I2C address written to Page 0 byte 0x1F;

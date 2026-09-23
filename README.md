@@ -2,7 +2,7 @@
 
 Write [NW-Device-Specification](https://github.com/NorthernWidget/NW-Device-Specification) **Page 0** identity blocks to NorthernWidget boards via avrdude.
 
-NW-Provision replaces the manual `MargaySetup.ino` workflow (flash setup sketch → serial interaction → reflash). It reads the existing EEPROM, patches the top 32 bytes with a freshly-built identity block, writes it back, and verifies the readback — without disturbing the firmware already on the board.
+NW-Provision replaces the manual `MargaySetup.ino` workflow (flash setup sketch → serial interaction → reflash). It reads the existing EEPROM, writes a freshly built identity block into Page 0 (the 32 bytes at `length-64`; Page 1, the device's calibration, sits above it and is left as found), writes the image back, and verifies the readback, without disturbing the firmware already on the board.
 
 ## Installation
 
@@ -68,7 +68,7 @@ Displays a formatted table of all units for a device from the registry, with a s
 nw-provision read --device Margay --programmer usbasp
 ```
 
-Reads the full EEPROM, extracts the top 32 bytes, prints them in a hex/ASCII table, and reports whether Page 0 passes Schema 1 validation.
+Reads the full EEPROM, extracts Page 0 (the 32 bytes at `length-64`; Page 1, the device's calibration, sits above it), prints them in a hex/ASCII table, and reports whether Page 0 passes Schema 1 validation.
 
 ### `verify` — validate raw hex bytes
 
@@ -111,7 +111,7 @@ Offset  Bytes  Contents
 0x1F    1      I2C address (0xFF = device default)
 ```
 
-Physical location: `EEPROM[length-32]` through `EEPROM[length-1]`.
+Physical location: `EEPROM[length-64]` through `EEPROM[length-33]`; Page 1 (calibration) occupies `EEPROM[length-32]` through `EEPROM[length-1]`. The two are one 64-byte stored image in bus order (NW-Device-Specification, renumbered 2026-09-23).
 
 ## NW-Registry integration
 

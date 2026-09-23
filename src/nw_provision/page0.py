@@ -1,7 +1,7 @@
 """
 Build and validate the 32-byte NW-Device-Specification Page 0 identity block.
 
-Physical location: EEPROM[length-32] through EEPROM[length-1].
+Physical location: EEPROM[length-64] through EEPROM[length-33]; Page 1 (calibration) fills the 32 bytes above it.
 I2C register map:  byte offset within Page 0 == I2C address (0x00–0x1F).
 
 Layout (Schema 1):
