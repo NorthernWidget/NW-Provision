@@ -15,8 +15,17 @@ Margay_Library reads this page at boot (Margay.cpp, "Calibration from Page 1") a
 back to its built-in constants when every byte is 0xFF. The values here are those constants,
 so a freshly provisioned board behaves exactly as an unprovisioned one.
 
-Sensors have no builder here: their Page 1 is written by their own firmware (Apis stores its
-zero there) and provisioning leaves it as found.
+Walrus layout (NW-Device-Specification, Walrus appendix):
+  0x20        MS5803 model: the bar figure in the part's order code, 1, 2, 5, 7, 14 or 30
+  0x21-0x3F   Reserved (0xFF)
+
+The Walrus carries whichever MS5803 was soldered to it, and the variants need different
+compensation constants. The firmware converts nothing without this byte: it serves the
+sensor's own ADC conversions instead, and the library labels the columns accordingly, so an
+unprovisioned board records data that can still be converted afterwards.
+
+Other sensors have no builder here: their Page 1 is written by their own firmware (Apis stores
+its zero there) and provisioning leaves it as found.
 """
 
 import struct
@@ -94,10 +103,33 @@ def build_blank_page1(model: str | int = 0) -> bytes:
     return b"\xFF" * PAGE1_SIZE
 
 
+MS5803_MODELS = (1, 2, 5, 7, 14, 30)   # the bar figure in the order code
+
+
+def build_walrus_page1(model: str | int = 5) -> bytes:
+    """Return a Walrus Page 1: the fitted MS5803's bar figure at 0x20, the rest unprogrammed.
+
+    `model` is the bar figure in the part's order code, so an MS5803-05BA is 5. The firmware
+    refuses to convert a reading for anything else, which is the point: a guess would give a
+    confidently wrong pressure and raise no fault.
+    """
+    bar = int(model)
+    if bar not in MS5803_MODELS:
+        raise ValueError(f"no such MS5803: {model!r}; expected one of {MS5803_MODELS}")
+    return bytes([bar]) + b"\xFF" * (PAGE1_SIZE - 1)
+
+
 PAGE1_BUILDERS = {
     LAYOUT_MARGAY: build_margay_page1,
     LAYOUT_BLANK: build_blank_page1,
+    "walrus": build_walrus_page1,
 }
+
+
+def decode_walrus_page1(data: bytes) -> dict:
+    """Decode a Walrus Page 1: which MS5803 the board carries."""
+    bar = data[0]
+    return {"ms5803_model": bar, "ms5803_known": bar in MS5803_MODELS}
 
 
 def page1_blank(data: bytes) -> bool:
