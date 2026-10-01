@@ -164,3 +164,51 @@ def test_device_layouts_have_builders():
     for dev in DEVICES.values():
         if dev.page1 is not None:
             assert dev.page1 in PAGE1_BUILDERS, dev.name
+
+
+# --- apis: the accelerometer zero and the count of zeros taken ---
+
+def test_apis_blank_when_never_zeroed():
+    from nw_provision.page1 import build_apis_page1, build_blank_page1
+    assert build_apis_page1() == build_blank_page1()
+
+def test_apis_zero_is_little_endian_int16_per_axis():
+    from nw_provision.page1 import build_apis_page1
+    page = build_apis_page1(zero=(-12, 5, 1024), zero_temperature=0x1234, generation=3)
+    assert len(page) == 32
+    assert page[0:2] == (-12).to_bytes(2, "little", signed=True)
+    assert page[2:4] == (5).to_bytes(2, "little", signed=True)
+    assert page[4:6] == (1024).to_bytes(2, "little", signed=True)
+
+def test_apis_zero_temperature_and_generation():
+    from nw_provision.page1 import build_apis_page1
+    page = build_apis_page1(zero=(0, 0, 0), zero_temperature=0x1234, generation=3)
+    assert int.from_bytes(page[6:8], "little") == 0x1234       # register 0x26
+    assert int.from_bytes(page[0x18:0x1A], "little") == 3      # register 0x38
+
+def test_apis_leaves_the_previous_zeros_unprogrammed():
+    """Only the firmware shifts that ring; inventing a history here would invent data."""
+    from nw_provision.page1 import build_apis_page1
+    page = build_apis_page1(zero=(1, 2, 3))
+    assert page[8:0x18] == b"\xFF" * 16                       # registers 0x28 to 0x37
+
+def test_apis_refuses_a_zero_that_is_not_three_axes():
+    from nw_provision.page1 import build_apis_page1
+    with pytest.raises(ValueError):
+        build_apis_page1(zero=(1, 2))
+
+def test_apis_refuses_an_offset_outside_an_int16():
+    from nw_provision.page1 import build_apis_page1
+    with pytest.raises(ValueError):
+        build_apis_page1(zero=(0, 0, 99999))
+
+def test_apis_refuses_generation_zero_and_the_blank():
+    """A stored zero is generation 1 or more, and 0xFFFF is what unprogrammed reads as."""
+    from nw_provision.page1 import build_apis_page1
+    for bad in (0, 0xFFFF):
+        with pytest.raises(ValueError):
+            build_apis_page1(zero=(0, 0, 0), generation=bad)
+
+def test_apis_builder_is_registered():
+    from nw_provision.page1 import build_apis_page1
+    assert PAGE1_BUILDERS["apis"] is build_apis_page1

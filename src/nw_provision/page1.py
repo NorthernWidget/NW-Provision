@@ -119,10 +119,56 @@ def build_walrus_page1(model: str | int = 5) -> bytes:
     return bytes([bar]) + b"\xFF" * (PAGE1_SIZE - 1)
 
 
+def build_apis_page1(
+    zero: tuple[int, int, int] | None = None,
+    zero_temperature: int = 0,
+    generation: int = 1,
+) -> bytes:
+    """Return an Apis Page 1: the accelerometer zero, and the count of zeros taken.
+
+    `zero` is the X, Y and Z offsets in the accelerometer's own counts, as the firmware
+    stores them at 0x20 to 0x25, little-endian int16 each. `zero_temperature` is the
+    OUT_ADC3 word at the moment they were taken (0x26 to 0x27), which is the reference
+    `getAccelerometerTemperatureChange()` measures against. `generation` is the number
+    of zeros stored since manufacture, at 0x38 to 0x39.
+
+    Pass no `zero` for a board that has never been zeroed: the page comes back
+    unprogrammed and the firmware reads a generation of 0, which is what a blank 0xFFFF
+    means. Note that a zero is an arbitrary reference wherever it is taken, so writing
+    one here is for reproducing a unit's recorded state rather than for calibrating it:
+    the board takes its own when a magnet reaches the Hall switch.
+
+    The two previous zeros, the ring the firmware keeps at 0x28 to 0x37, are left
+    unprogrammed. Only the firmware shifts that ring, and inventing a history here would
+    be inventing data.
+    """
+    if zero is None:
+        return build_blank_page1()
+    if len(zero) != 3:
+        raise ValueError(f"a zero is three axes; got {len(zero)}")
+    for axis, v in zip("XYZ", zero):
+        if not -32768 <= int(v) <= 32767:
+            raise ValueError(f"offset {axis} is {v}, outside an int16")
+    if not 0 <= int(zero_temperature) <= 0xFFFF:
+        raise ValueError(f"zero temperature word is {zero_temperature}, outside a uint16")
+    if not 1 <= int(generation) <= 0xFFFE:
+        raise ValueError(
+            f"generation is {generation}; a stored zero is at least 1, and 0xFFFF is the blank"
+        )
+
+    page = bytearray(b"\xFF" * PAGE1_SIZE)
+    for i, v in enumerate(zero):
+        page[2 * i : 2 * i + 2] = int(v).to_bytes(2, "little", signed=True)
+    page[6:8] = int(zero_temperature).to_bytes(2, "little")
+    page[0x18:0x1A] = int(generation).to_bytes(2, "little")   # 0x38 on the page, Block 3
+    return bytes(page)
+
+
 PAGE1_BUILDERS = {
     LAYOUT_MARGAY: build_margay_page1,
     LAYOUT_BLANK: build_blank_page1,
     "walrus": build_walrus_page1,
+    "apis": build_apis_page1,
 }
 
 
