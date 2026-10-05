@@ -83,6 +83,17 @@ nw-provision verify 01 4D 61 72 67 61 79 00 03 00 02 ...
 
 Accepts 32 space-separated hex bytes and validates them offline (no hardware needed).
 
+## Flash a sensor before you provision it
+
+The order matters on the ATtiny sensors and nowhere else, and getting it wrong looks like a library bug rather than a mistake.
+
+- **Margay and Okapi are safe either way.** Their upload goes through the serial bootloader, whose avrdude recipe carries `-D` (`NorthernWidget:avr` `platform.txt` line 18): no chip erase, EEPROM untouched. Re-flash a provisioned logger as often as you like.
+- **Walrus, Apis, Haar, Libelle and Tally are not.** An ATtiny has no bootloader, so the upload goes by ISP, and ATTinyCore's program recipe has **no `-D`** (`ATTinyCore:avr` `platform.txt` line 123). avrdude therefore chip-erases before it writes, and a chip erase takes the EEPROM with it **unless the EESAVE fuse is programmed**. That fuse is written by Burn Bootloader and never by an upload (`boards.txt` lines 2160 to 2165, where the default menu entry is "EEPROM retained", `eesave_bit=0`), and it is unprogrammed on a part that has never had a bootloader burned.
+
+So: **write the firmware first, then provision**, or confirm EESAVE is programmed on that part before you provision it. Provision first and re-flash, and Page 0 is gone.
+
+What that failure looks like, so it is not mistaken for something else: the device answers its address but serves an erased Page 0, so the library's `begin()` refuses at the schema gate and a logger writes `NotSchema1`, or `NotAnswering` when the read itself fails. Nothing in the firmware or the library is wrong at that point; the identity block simply is not there any more. `nw-provision read <device>` says so in one line.
+
 ## Supported devices
 
 | Device  | MCU          | EEPROM | avrdude part | I2C address | board_type high byte |
