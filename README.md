@@ -90,7 +90,29 @@ The order matters on the ATtiny sensors and nowhere else, and getting it wrong l
 - **Margay and Okapi are safe either way.** Their upload goes through the serial bootloader, whose avrdude recipe carries `-D` (`NorthernWidget:avr` `platform.txt` line 18): no chip erase, EEPROM untouched. Re-flash a provisioned logger as often as you like.
 - **Walrus, Apis, Haar, Libelle and Tally are not.** An ATtiny has no bootloader, so the upload goes by ISP, and ATTinyCore's program recipe has **no `-D`** (`ATTinyCore:avr` `platform.txt` line 123). avrdude therefore chip-erases before it writes, and a chip erase takes the EEPROM with it **unless the EESAVE fuse is programmed**. That fuse is written by Burn Bootloader and never by an upload (`boards.txt` lines 2160 to 2165, where the default menu entry is "EEPROM retained", `eesave_bit=0`), and it is unprogrammed on a part that has never had a bootloader burned.
 
-So: **write the firmware first, then provision**, or confirm EESAVE is programmed on that part before you provision it. Provision first and re-flash, and Page 0 is gone.
+**Program EESAVE once per part and the ordering problem disappears**, which is the fix rather than the workaround. Two ways, and the right one depends on whether the board is already provisioned:
+
+**A part with nothing to lose** (new, or one you are happy to erase). `burn-bootloader` writes all three fuses from the board menu, and ATTinyCore's recipe chip-erases first, so do this before provisioning:
+
+```sh
+arduino-cli burn-bootloader --fqbn ATTinyCore:avr:attiny1634:eesave=aenable \
+                            --programmer avrispmkii
+```
+
+The `eesave=aenable` menu entry is "EEPROM retained" and sets the fuse bit to 0 (`boards.txt` lines 2162 to 2165). The recipe is `-e -Uefuse -Uhfuse -Ulfuse -Uflash` (`platform.txt` line 127), so it also writes the low fuse, which selects the clock source, and flashes an empty bootloader image. That is fine on a part you are setting up and wrong on one you are not.
+
+**A part that is already provisioned.** Do **not** use `burn-bootloader`: it would erase the Page 0 and Page 1 you are trying to protect, and overwrite the low fuse as well. Clear the one bit instead, which needs no erase and leaves flash and EEPROM alone:
+
+```sh
+avrdude -c avrispmkii -p t1634 -U hfuse:r:-:h      # read it, e.g. 0xdf
+avrdude -c avrispmkii -p t1634 -U hfuse:w:0xd7:m   # the same byte with bit 3 cleared
+```
+
+**Read the byte and clear bit 3 of what you read.** Do not copy a fuse byte out of a document: writing a whole byte is how a part loses its clock source, and the other bits of that fuse are the brown-out level, which is a board decision. EESAVE is bit 3, programmed as 0, which ATTinyCore states three consistent ways (`high_fuses=0b1101{eesave_bit}{bod_bits}`, the menu above, and the non-menu fallback `0xD7`). Confirm it against the ATtiny1634 datasheet before trusting it on a part you cannot replace.
+
+With EESAVE programmed, flash and provision in whatever order suits you, for the life of the board.
+
+**Until then: write the firmware first, then provision**, or confirm EESAVE on that part before you provision it. Provision first and re-flash, and Page 0 is gone.
 
 What that failure looks like, so it is not mistaken for something else: the device answers its address but serves an erased Page 0, so the library's `begin()` refuses at the schema gate and a logger writes `NotSchema1`, or `NotAnswering` when the read itself fails. Nothing in the firmware or the library is wrong at that point; the identity block simply is not there any more. `nw-provision read <device>` says so in one line.
 
